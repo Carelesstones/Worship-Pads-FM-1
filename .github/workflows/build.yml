@@ -25,18 +25,18 @@ jobs:
     - name: Download the official JieLi Toolchain
       run: |
         Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli_installer.exe"
-        # Extract the official Windows installer using 7-Zip
         7z x jieli_installer.exe -o"C:\JL\pi32" -y
         
     - name: Compile the Firmware
       run: |
         cd sdk
-        # Dynamically find the compiler path in case the installer nested the folders
         $ClangPath = (Get-ChildItem -Path "C:\JL\pi32" -Filter "clang.exe" -Recurse).DirectoryName
-        .\Build.ps1 -FirmwareOnly -Toolchain $ClangPath
+        # Pointing to the internal sdk folder to find the script
+        .\sdk\Build.ps1 -FirmwareOnly -Toolchain $ClangPath
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
       with:
         name: FM1-Ambient-Pads
-        path: sdk/out/*.fwsc
+        # Using a wildcard to automatically find the .fwsc file wherever the compiler drops it
+        path: sdk/**/*.fwsc
