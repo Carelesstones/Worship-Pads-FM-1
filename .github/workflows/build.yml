@@ -22,15 +22,18 @@ jobs:
         Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
         Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
 
-    - name: Download the JieLi pi32v2 Toolchain
+    - name: Download the official JieLi Toolchain
       run: |
-        Invoke-WebRequest -Uri "https://github.com/aroum/fm1-custom-fw/releases/download/v1.0/pi32v2.zip" -OutFile "pi32.zip"
-        Expand-Archive -Path "pi32.zip" -DestinationPath "C:\JL\"
+        Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli_installer.exe"
+        # Extract the official Windows installer using 7-Zip
+        7z x jieli_installer.exe -o"C:\JL\pi32" -y
         
     - name: Compile the Firmware
       run: |
         cd sdk
-        .\Build.ps1 -FirmwareOnly -Toolchain "C:\JL\pi32"
+        # Dynamically find the compiler path in case the installer nested the folders
+        $ClangPath = (Get-ChildItem -Path "C:\JL\pi32" -Filter "clang.exe" -Recurse).DirectoryName
+        .\Build.ps1 -FirmwareOnly -Toolchain $ClangPath
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
