@@ -18,7 +18,9 @@ jobs:
       run: git clone https://github.com/m-vave/fm1_open.git sdk
 
     - name: Inject your C++ file into the SDK
-      run: Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\apps\fm1\main.cpp" -Force
+      run: |
+        Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
+        Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
 
     - name: Download the JieLi pi32v2 Toolchain
       run: |
