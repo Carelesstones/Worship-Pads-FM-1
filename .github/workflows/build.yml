@@ -22,21 +22,21 @@ jobs:
         Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
         Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
 
-    - name: Download the official JieLi Toolchain
+    - name: Download and Install JieLi Toolchain
       run: |
         Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli_installer.exe"
-        7z x jieli_installer.exe -o"C:\JL\pi32" -y
+        # Run the installer silently in the background instead of extracting it
+        Start-Process -FilePath ".\jieli_installer.exe" -ArgumentList "/VERYSILENT", "/DIR=C:\JL" -Wait -NoNewWindow
         
     - name: Compile the Firmware
       run: |
         cd sdk
-        $ClangPath = (Get-ChildItem -Path "C:\JL\pi32" -Filter "clang.exe" -Recurse).DirectoryName
-        # Pointing to the internal sdk folder to find the script
-        .\sdk\Build.ps1 -FirmwareOnly -Toolchain $ClangPath
+        # Explicitly set the environment variable required by the M-VAVE script
+        $env:FM1_PI32_TOOLCHAIN = "C:\JL\pi32"
+        .\sdk\Build.ps1 -FirmwareOnly
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
       with:
         name: FM1-Ambient-Pads
-        # Using a wildcard to automatically find the .fwsc file wherever the compiler drops it
         path: sdk/**/*.fwsc
