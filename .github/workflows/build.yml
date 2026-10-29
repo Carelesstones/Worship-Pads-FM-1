@@ -1,1 +1,37 @@
+name: Compile FM-1 Worship Firmware
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout your custom code
+      uses: actions/checkout@v4
+
+    - name: Clone the official M-VAVE SDK
+      run: git clone https://github.com/m-vave/fm1_open.git sdk
+
+    - name: Inject your C++ file into the SDK
+      run: Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\apps\fm1\main.cpp" -Force
+
+    - name: Download the JieLi pi32v2 Toolchain
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/aroum/fm1-custom-fw/releases/download/v1.0/pi32v2.zip" -OutFile "pi32.zip"
+        Expand-Archive -Path "pi32.zip" -DestinationPath "C:\JL\"
+        
+    - name: Compile the Firmware
+      run: |
+        cd sdk
+        .\Build.ps1 -FirmwareOnly -Toolchain "C:\JL\pi32"
+
+    - name: Upload the final .fwsc file
+      uses: actions/upload-artifact@v4
+      with:
+        name: FM1-Ambient-Pads
+        path: sdk/out/*.fwsc
