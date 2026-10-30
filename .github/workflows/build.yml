@@ -1,4 +1,4 @@
-name: Compile FM-1 Worship Firmware
+name: Package JieLi Toolchain
 
 on:
   workflow_dispatch:
@@ -7,34 +7,24 @@ on:
       - main
 
 jobs:
-  build:
+  package:
     runs-on: windows-latest
     
     steps:
-    - name: Checkout your custom code
-      uses: actions/checkout@v4
-
-    - name: Clone the fm1-core community template
-      run: git clone https://github.com/rgrvmusic/fm1-core.git sdk
-
-    - name: Inject Custom C Code
+    - name: Download and Extract
       run: |
-        Copy-Item -Path ".\ai_studio_code.c" -Destination ".\sdk\examples\sine.c" -Force
+        choco install innoextract -y --no-progress
+        Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli.exe"
+        innoextract jieli.exe -d "C:\JL" || 7z x jieli.exe -o"C:\JL" -y
 
-    - name: Download and Setup Toolchain
+    - name: Package pi32 Folder
       run: |
-        # Replace this URL with the direct link to your hosted toolchain zip
-        Invoke-WebRequest -Uri "YOUR_HOSTED_ZIP_URL" -OutFile "pi32.zip"
-        Expand-Archive -Path "pi32.zip" -DestinationPath "C:\JL\pi32" -Force
-        echo "FM1_PI32_TOOLCHAIN=C:\JL\pi32" >> $env:GITHUB_ENV
+        $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        $Pi32Path = $ClangExe.Directory.Parent.FullName
+        Compress-Archive -Path "$Pi32Path\*" -DestinationPath "pi32.zip" -Force
 
-    - name: Compile the Firmware
-      run: |
-        cd sdk
-        python tools/build.py
-
-    - name: Upload the final .fwsc file
+    - name: Output the Zip
       uses: actions/upload-artifact@v4
       with:
-        name: FM1-Ambient-Pads
-        path: "sdk/**/*.fwsc"
+        name: Toolchain-Download
+        path: pi32.zip
