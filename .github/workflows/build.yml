@@ -22,21 +22,20 @@ jobs:
         Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
         Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
 
-    - name: Download and Install JieLi Toolchain
+    - name: Brute-Force Extract Toolchain & Compile
       run: |
-        Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli_installer.exe"
-        # Force the NSIS installer to run silently and install to C:\JL
-        Start-Process -FilePath ".\jieli_installer.exe" -ArgumentList "/S", "/D=C:\JL" -Wait -NoNewWindow
+        choco install innoextract -y --no-progress
+        Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli.exe"
         
-    - name: Compile the Firmware
-      run: |
-        cd sdk
-        # Find exactly where the silent installer dropped the compiler
+        # Rip the files out without running the installer
+        innoextract jieli.exe -d "C:\JL" || 7z x jieli.exe -o"C:\JL" -y
+        
+        # Search the extracted folder for the compiler
         $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($null -eq $ClangExe) { throw "Toolchain failed to extract properly." }
-        
         $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
-        .\sdk\Build.ps1 -FirmwareOnly
+        
+        cd sdk
+        .\Build.ps1 -FirmwareOnly
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
