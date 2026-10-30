@@ -22,21 +22,20 @@ jobs:
         Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
         Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
 
-    - name: Download and Extract JieLi Toolchain
+    - name: Download and Install JieLi Toolchain
       run: |
         Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli_installer.exe"
-        # Bypass the graphical installer entirely by extracting the raw files
-        7z x jieli_installer.exe -o"C:\JL_temp" -y
+        # Force the NSIS installer to run silently and install to C:\JL
+        Start-Process -FilePath ".\jieli_installer.exe" -ArgumentList "/S", "/D=C:\JL" -Wait -NoNewWindow
         
     - name: Compile the Firmware
       run: |
         cd sdk
-        # Dynamically search the extracted files for the compiler
-        $ClangExe = Get-ChildItem -Path "C:\JL_temp" -Filter "clang.exe" -Recurse | Select-Object -First 1
-        $Pi32Dir = $ClangExe.Directory.Parent.FullName
+        # Find exactly where the silent installer dropped the compiler
+        $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $ClangExe) { throw "Toolchain failed to extract properly." }
         
-        # Tell the M-VAVE script exactly where it is
-        $env:FM1_PI32_TOOLCHAIN = $Pi32Dir
+        $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
         .\sdk\Build.ps1 -FirmwareOnly
 
     - name: Upload the final .fwsc file
