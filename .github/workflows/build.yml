@@ -35,7 +35,8 @@ jobs:
         $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
         
         cd sdk
-        .\Build.ps1 -FirmwareOnly
+        # Pointing to the internal sdk folder to find the script
+        .\sdk\Build.ps1 -FirmwareOnly
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
