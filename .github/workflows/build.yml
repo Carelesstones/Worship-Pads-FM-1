@@ -19,10 +19,7 @@ jobs:
 
     - name: Inject your C++ file into the SDK
       run: |
-        # Inject our custom C++ firmware application over the example template
         Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\examples\ambient.cpp" -Force
-        
-        # Patch the Python build script to compile our C++ file instead of the default C example
         cd sdk
         (Get-Content tools/build.py) -replace 'examples/sine\.c', 'examples/ambient.cpp' | Set-Content tools/build.py
 
@@ -31,16 +28,12 @@ jobs:
         choco install innoextract -y --no-progress
         Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli.exe"
         innoextract jieli.exe -d "C:\JL" || 7z x jieli.exe -o"C:\JL" -y
-        $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        
-        # Save the path to the environment so the Python build driver can find it
-        $ToolchainPath = $ClangExe.Directory.Parent.FullName
-        echo "FM1_PI32_TOOLCHAIN=$ToolchainPath" >> $env:GITHUB_ENV
 
     - name: Compile the Firmware
       run: |
         cd sdk
-        # Compile using the Python build driver
+        $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
         python tools/build.py
 
     - name: Upload the final .fwsc file
