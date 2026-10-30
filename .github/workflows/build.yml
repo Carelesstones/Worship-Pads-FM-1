@@ -14,29 +14,34 @@ jobs:
     - name: Checkout your custom code
       uses: actions/checkout@v4
 
-    - name: Clone the official M-VAVE SDK
-      run: git clone https://github.com/m-vave/fm1_open.git sdk
+    - name: Clone the fm1-core community template
+      run: git clone https://github.com/rgrvmusic/fm1-core.git sdk
 
     - name: Inject your C++ file into the SDK
       run: |
-        Remove-Item -Path ".\sdk\app\main.c" -ErrorAction SilentlyContinue
-        Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\app\main.cpp" -Force
+        # Inject our custom C++ firmware application over the example template
+        Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\examples\ambient.cpp" -Force
+        
+        # Patch the Python build script to compile our C++ file instead of the default C example
+        cd sdk
+        (Get-Content tools/build.py) -replace 'examples/sine\.c', 'examples/ambient.cpp' | Set-Content tools/build.py
 
-    - name: Brute-Force Extract Toolchain & Compile
+    - name: Extract Toolchain
       run: |
         choco install innoextract -y --no-progress
         Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli.exe"
-        
-        # Rip the files out without running the installer
         innoextract jieli.exe -d "C:\JL" || 7z x jieli.exe -o"C:\JL" -y
-        
-        # Search the extracted folder for the compiler
         $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
         
+        # Save the path to the environment so the Python build driver can find it
+        $ToolchainPath = $ClangExe.Directory.Parent.FullName
+        echo "FM1_PI32_TOOLCHAIN=$ToolchainPath" >> $env:GITHUB_ENV
+
+    - name: Compile the Firmware
+      run: |
         cd sdk
-        # Pointing to the internal sdk folder to find the script
-        .\sdk\Build.ps1 -FirmwareOnly
+        # Compile using the Python build driver
+        python tools/build.py
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
