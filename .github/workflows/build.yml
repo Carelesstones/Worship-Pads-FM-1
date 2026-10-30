@@ -17,26 +17,21 @@ jobs:
     - name: Clone the fm1-core community template
       run: git clone https://github.com/rgrvmusic/fm1-core.git sdk
 
-    - name: Inject C++ code and Forced Bluetooth Stubs
+    - name: Inject Custom Code and Bluetooth Stubs
       run: |
-        # Create the stubs with attributes forcing the compiler to keep them
-        cat << 'EOF' > stubs.h
-        extern "C" {
-            __attribute__((used)) void connectivity_w182_bluetooth_start(void) {}
-            __attribute__((used)) void audio_app_bluetooth_open(void) {}
-            __attribute__((used)) const char* bt_get_local_name(void) { return "FM-1 Pads"; }
-            __attribute__((used)) void* bt_get_mac_addr(void) { static char mac[6]={0}; return (void*)mac; }
-        }
+        # Overwrite the default example file so the build script natively finds it
+        cp ./ai_studio_code.cpp ./sdk/examples/sine.c
+        
+        # Safely inject the Bluetooth stubs into a core C file to guarantee linking
+        cat << 'EOF' >> ./sdk/platform/hooks.c
+        
+        void connectivity_w182_bluetooth_start(void) {}
+        void audio_app_bluetooth_open(void) {}
+        const char* bt_get_local_name(void) { return "FM-1 Pads"; }
+        void* bt_get_mac_addr(void) { static char mac[6]={0}; return (void*)mac; }
         EOF
-        
-        # Combine the stubs at the TOP of your C++ file to avoid syntax conflicts
-        cat stubs.h ./ai_studio_code.cpp > ./sdk/examples/ambient.cpp
-        
-        cd sdk
-        # Point the build script back to the .cpp file
-        sed -i 's/examples\/sine\.c/examples\/ambient.cpp/' tools/build.py
 
-    - name: Setup JieLi Linux Toolchain
+    - name: Setup Toolchain and Compiler Wrapper
       run: |
         wget -qO jieli-linux.tar.xz "https://pkgman.jieliapp.com/s/linux-toolchain"
         mkdir -p /opt/jieli
@@ -44,6 +39,20 @@ jobs:
         CLANG_BIN=$(find /opt/jieli -name clang | head -n 1)
         TOOLCHAIN_DIR=$(dirname $(dirname "$CLANG_BIN"))
         echo "FM1_PI32_TOOLCHAIN=$TOOLCHAIN_DIR" >> $GITHUB_ENV
+        
+        # Trick the compiler into building the disguised .c file as C++
+        CLANG_DIR=$(dirname "$CLANG_BIN")
+        mv "$CLANG_BIN" "$CLANG_DIR/clang_real"
+        
+        cat << EOF > "$CLANG_BIN"
+        #!/bin/bash
+        if [[ "\$*" == *"sine.c"* ]]; then
+            exec "$CLANG_DIR/clang_real" -xc++ "\$@"
+        else
+            exec "$CLANG_DIR/clang_real" "\$@"
+        fi
+        EOF
+        chmod +x "$CLANG_BIN"
 
     - name: Compile the Firmware
       run: |
