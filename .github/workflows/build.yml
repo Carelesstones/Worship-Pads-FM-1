@@ -17,22 +17,23 @@ jobs:
     - name: Clone the fm1-core community template
       run: git clone https://github.com/rgrvmusic/fm1-core.git sdk
 
-    - name: Inject C++ code and Bluetooth Stubs
+    - name: Inject C code and Bluetooth Stubs
       run: |
-        cp ./ai_studio_code.cpp ./sdk/examples/ambient.cpp
+        # Rename to .c so the Python script actually compiles it
+        cp ./ai_studio_code.cpp ./sdk/examples/ambient.c
         
-        cat << 'EOF' >> ./sdk/examples/ambient.cpp
+        # Inject standard C dummy functions to satisfy the linker
+        cat << 'EOF' >> ./sdk/examples/ambient.c
         
-        extern "C" {
-            void connectivity_w182_bluetooth_start(void) {}
-            void audio_app_bluetooth_open(void) {}
-            const char* bt_get_local_name(void) { return "FM-1 Pads"; }
-            void* bt_get_mac_addr(void) { static char mac[6]={0}; return mac; }
-        }
+        void connectivity_w182_bluetooth_start(void) {}
+        void audio_app_bluetooth_open(void) {}
+        const char* bt_get_local_name(void) { return "FM-1 Pads"; }
+        void* bt_get_mac_addr(void) { static char mac[6]={0}; return (void*)mac; }
         EOF
         
         cd sdk
-        sed -i 's/examples\/sine\.c/examples\/ambient.cpp/' tools/build.py
+        # Point the build script to the new .c file
+        sed -i 's/examples\/sine\.c/examples\/ambient.c/' tools/build.py
 
     - name: Setup JieLi Linux Toolchain
       run: |
