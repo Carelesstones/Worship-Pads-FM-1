@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout your custom code
@@ -19,22 +19,27 @@ jobs:
 
     - name: Inject your C++ file into the SDK
       run: |
-        Copy-Item -Path ".\ai_studio_code.cpp" -Destination ".\sdk\examples\ambient.cpp" -Force
+        cp ./ai_studio_code.cpp ./sdk/examples/ambient.cpp
         cd sdk
-        (Get-Content tools/build.py) -replace 'examples/sine\.c', 'examples/ambient.cpp' | Set-Content tools/build.py
+        sed -i 's/examples\/sine\.c/examples\/ambient.cpp/' tools/build.py
 
-    - name: Extract Toolchain
+    - name: Setup JieLi Linux Toolchain
       run: |
-        choco install innoextract -y --no-progress
-        Invoke-WebRequest -Uri "https://pkgman.jieliapp.com/s/win-toolchain" -OutFile "jieli.exe"
-        innoextract jieli.exe -d "C:\JL" || 7z x jieli.exe -o"C:\JL" -y
+        wget -qO jieli-linux.tar.xz "https://pkgman.jieliapp.com/s/linux-toolchain"
+        mkdir -p /opt/jieli
+        tar -xf jieli-linux.tar.xz -C /opt/jieli
+        
+        # Locate the exact folder containing bin/clang
+        CLANG_BIN=$(find /opt/jieli -name clang | head -n 1)
+        TOOLCHAIN_DIR=$(dirname $(dirname "$CLANG_BIN"))
+        
+        # Export the variable cleanly to the GitHub Actions environment
+        echo "FM1_PI32_TOOLCHAIN=$TOOLCHAIN_DIR" >> $GITHUB_ENV
 
     - name: Compile the Firmware
       run: |
         cd sdk
-        $ClangExe = Get-ChildItem -Path "C:\JL" -Filter "clang.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        $env:FM1_PI32_TOOLCHAIN = $ClangExe.Directory.Parent.FullName
-        python tools/build.py
+        python3 tools/build.py
 
     - name: Upload the final .fwsc file
       uses: actions/upload-artifact@v4
